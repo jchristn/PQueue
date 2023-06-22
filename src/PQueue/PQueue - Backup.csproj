@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net461;net48;net6.0;net7.0</TargetFrameworks>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    <DocumentationFile>PQueue.xml</DocumentationFile>
+    <SignAssembly>True</SignAssembly>
+    <AssemblyOriginatorKeyFile>C:\Code\Misc\PQueue\src\PQueue.snk</AssemblyOriginatorKeyFile>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>PQueue</Title>
+    <Authors>Joel Christner</Authors>
+    <Description>Lightweight, persistent, thread-safe, disk-based queue written in C#</Description>
+    <Copyright>(c)2023 Joel Christner</Copyright>
+    <PackageProjectUrl>https://github.com/jchristn/PQueue</PackageProjectUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <RepositoryUrl>https://github.com/jchristn/PQueue</RepositoryUrl>
+    <RepositoryType>github</RepositoryType>
+    <PackageTags>queue persistent persistence disk</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\icon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Assets\icon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>

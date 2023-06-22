@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>PQueue</name>
+    </assembly>
+    <members>
+        <member name="T:PQueue.PersistentQueue">
+            <summary>
+            Persistent queue.  Queued entries are backed on disk.
+            </summary>
+        </member>
+        <member name="P:PQueue.PersistentQueue.Depth">
+            <summary>
+            Number of entries waiting in the queue.
+            </summary>
+        </member>
+        <member name="P:PQueue.PersistentQueue.DataQueued">
+            <summary>
+            Event handler for when data is queued.
+            </summary>
+        </member>
+        <member name="P:PQueue.PersistentQueue.DataDequeued">
+            <summary>
+            Event handler for when data is dequeued.
+            </summary>
+        </member>
+        <member name="P:PQueue.PersistentQueue.DataDeleted">
+            <summary>
+            Event handler for when data is deleted.
+            </summary>
+        </member>
+        <member name="P:PQueue.PersistentQueue.QueueCleared">
+            <summary>
+            Event handler for when the queue is cleared.
+            </summary>
+        </member>
+        <member name="M:PQueue.PersistentQueue.#ctor(System.String,System.Boolean)">
+            <summary>
+            Instantiate.
+            </summary>
+            <param name="directory">Directory.</param>
+            <param name="clearOnDispose">Clear the queue's contents on dispose.  This will delete queued data.</param>
+        </member>
+        <member name="M:PQueue.PersistentQueue.Dispose">
+            <summary>
+            Dispose.
+            </summary>
+        </member>
+        <member name="M:PQueue.PersistentQueue.Enqueue(System.Byte[])">
+            <summary>
+            Add data to the queue.
+            </summary>
+            <param name="data">Data.</param>
+            <returns>Key.</returns>
+        </member>
+        <member name="M:PQueue.PersistentQueue.EnqueueAsync(System.Byte[],System.Threading.CancellationToken)">
+            <summary>
+            Add data to the queue asynchronously.
+            </summary>
+            <param name="data">Data.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Key.</returns>
+        </member>
+        <member name="M:PQueue.PersistentQueue.Dequeue(System.String,System.Boolean)">
+            <summary>
+            Retrieve data from the queue.
+            </summary>
+            <param name="key">Key, if a specific key is needed.</param>
+            <param name="purge">Boolean flag indicating whether or not the entry should be removed from the queue once read.</param>
+            <returns>Data.</returns>
+        </member>
+        <member name="M:PQueue.PersistentQueue.DequeueAsync(System.String,System.Boolean,System.Threading.CancellationToken)">
+            <summary>
+            Retrieve data from the queue asynchronously.
+            </summary>
+            <param name="key">Key, if a specific key is needed.</param>
+            <param name="purge">Boolean flag indicating whether or not the entry should be removed from the queue once read.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Data.</returns>
+        </member>
+        <member name="M:PQueue.PersistentQueue.Purge(System.String)">
+            <summary>
+            Remove a specific entry from the queue.
+            </summary>
+            <param name="key">Key.</param>
+        </member>
+        <member name="M:PQueue.PersistentQueue.Clear">
+            <summary>
+            Destructively empty the queue.  This will delete all of the files in the directory.
+            </summary>
+        </member>
+    </members>
+</doc>
