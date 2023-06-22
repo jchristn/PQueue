@@ -1,4 +1,4 @@
-![alt tag](https://raw.githubusercontent.com/jchristn/PQueue/master/Assets/icon.ico)
+![alt tag](https://github.com/jchristn/PQueue/blob/main/src/PQueue/Assets/icon.png?raw=true)
 
 # PQueue
 
