@@ -22,14 +22,16 @@ queue = new PersistentQueue("./temp/");        // persist data even after dispos
 queue = new PersistentQueue("./temp/", true);  // delete data after disposed
 
 string key = null;
-key = queue.Enqueue(Encoding.UTF8.GetBytes("Hello, world!"));
-key = await queue.EnqueueAsync(Encoding.UTF8.GetBytes("Hello, world!"));
+key = queue.Enqueue(Encoding.UTF8.GetBytes("Hello, world!"));             // add to the queue
+key = await queue.EnqueueAsync(Encoding.UTF8.GetBytes("Hello, world!"));  // add to the queue asynchronously
 
 byte[] data = null;
-queue.Dequeue();           // get the latest
-queue.Dequeue(key);        // get a specific entry
-queue.Dequeue(key, true);  // get a specific entry and delete it
-queue.Purge(key);          // delete a specific entry
+data = queue.Dequeue();                // get the latest
+data = queue.Dequeue(key);             // get a specific entry
+data = queue.Dequeue(key, true);       // get a specific entry and delete it
+data = await.queue.DequeueAsync(key);  // get a specific entry asynchronously
+
+queue.Purge(key);  // delete a specific entry
 
 Console.WriteLine("Queue depth: " + queue.Depth);
 ```
