@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
-		<TargetFrameworks>net461;net48;net6.0;net7.0</TargetFrameworks>
+		<TargetFrameworks>net48;net6.0;net7.0;net8.0</TargetFrameworks>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -10,7 +10,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Inputty" Version="1.0.5" />
+		<PackageReference Include="Inputty" Version="1.0.12" />
 	</ItemGroup>
 
 	<ItemGroup>

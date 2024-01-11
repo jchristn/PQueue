@@ -9,6 +9,7 @@ Lightweight, persistent, thread-safe, disk-based queue written in C#.
 ## New in v1.0.x
 
 - Initial release
+- Added expiration to queued data
 
 ## Getting Started
 
@@ -22,18 +23,31 @@ queue = new PersistentQueue("./temp/");        // persist data even after dispos
 queue = new PersistentQueue("./temp/", true);  // delete data after disposed
 
 string key = null;
-key = queue.Enqueue(Encoding.UTF8.GetBytes("Hello, world!"));             // add to the queue
-key = await queue.EnqueueAsync(Encoding.UTF8.GetBytes("Hello, world!"));  // add to the queue asynchronously
 
-byte[] data = null;
+// Add to the queue...
+key = queue.Enqueue("Hello, world!");            
+key = await queue.EnqueueAsync("Hello, world!"); // async
+
+// Add to the queue with expiration...
+key = queue.Enqueue("Hello, world!", DateTime.Parse("1/10/2024 01:23:45"));              
+key = await queue.EnqueueAsync("Hello, world!", DateTime.Parse("1/10/2024 01:23:45")); // async
+
+(string, byte[])? data = null;
 data = queue.Dequeue();                // get the latest
 data = queue.Dequeue(key);             // get a specific entry
 data = queue.Dequeue(key, true);       // get a specific entry and delete it
 data = await.queue.DequeueAsync(key);  // get a specific entry asynchronously
 
-queue.Purge(key);  // delete a specific entry
+if (data != null) 
+  Console.WriteLine(data.Item1 + ": " + Encoding.UTF8.GetString(data.Item2));
 
-Console.WriteLine("Queue depth: " + queue.Depth);
+queue.Purge(key);  // delete a specific entry
+queue.Expire(key); // expire a specific entry
+
+DateTime? expiry = queue.GetExpiration(key); // get the expiration time of a specific entry
+
+Console.WriteLine("Queue depth  : " + queue.Depth);
+Console.WriteLine("Queue length : " + queue.Length + " bytes");
 ```
 
 ## Version History

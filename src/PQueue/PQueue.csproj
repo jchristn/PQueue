@@ -1,24 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>net461;net48;net6.0;net7.0</TargetFrameworks>
+		<TargetFrameworks>net48;net6.0;net7.0;net8.0</TargetFrameworks>
 		<ApplicationIcon>Assets\icon.ico</ApplicationIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<DocumentationFile>PQueue.xml</DocumentationFile>
-		<SignAssembly>True</SignAssembly>
-		<AssemblyOriginatorKeyFile>C:\Code\Misc\PQueue\src\PQueue.snk</AssemblyOriginatorKeyFile>
 		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 		<Title>PQueue</Title>
 		<Authors>Joel Christner</Authors>
 		<Description>Lightweight, persistent, thread-safe, disk-based queue written in C#</Description>
-		<Copyright>(c)2023 Joel Christner</Copyright>
+		<Copyright>(c)2024 Joel Christner</Copyright>
 		<PackageProjectUrl>https://github.com/jchristn/PQueue</PackageProjectUrl>
 		<PackageIcon>icon.png</PackageIcon>
 		<RepositoryUrl>https://github.com/jchristn/PQueue</RepositoryUrl>
 		<RepositoryType>github</RepositoryType>
 		<PackageTags>queue persistent persistence disk</PackageTags>
 		<PackageReleaseNotes>Initial release</PackageReleaseNotes>
-		<Version>1.0.0</Version>
+		<Version>1.0.5</Version>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -26,6 +25,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<None Include="..\..\README.md">
+		  <Pack>True</Pack>
+		  <PackagePath>\</PackagePath>
+		</None>
 		<None Include="Assets\icon.png">
 			<Pack>True</Pack>
 			<PackagePath>\</PackagePath>

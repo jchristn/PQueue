@@ -14,6 +14,11 @@
             Number of entries waiting in the queue.
             </summary>
         </member>
+        <member name="P:PQueue.PersistentQueue.Length">
+            <summary>
+            Number of bytes waiting in the queue.
+            </summary>
+        </member>
         <member name="P:PQueue.PersistentQueue.DataQueued">
             <summary>
             Event handler for when data is queued.
@@ -29,9 +34,29 @@
             Event handler for when data is deleted.
             </summary>
         </member>
+        <member name="P:PQueue.PersistentQueue.DataExpired">
+            <summary>
+            Event handler for when data is expired.
+            </summary>
+        </member>
+        <member name="P:PQueue.PersistentQueue.ExceptionEncountered">
+            <summary>
+            Event handler for when an exception is raised.
+            </summary>
+        </member>
         <member name="P:PQueue.PersistentQueue.QueueCleared">
             <summary>
             Event handler for when the queue is cleared.
+            </summary>
+        </member>
+        <member name="P:PQueue.PersistentQueue.ExpiryFile">
+            <summary>
+            Name of the expiration file.  This file will live in the same directory as queued objects.
+            </summary>
+        </member>
+        <member name="P:PQueue.PersistentQueue.ExpirationIntervalMs">
+            <summary>
+            The number of milliseconds in between checks for expired files.
             </summary>
         </member>
         <member name="M:PQueue.PersistentQueue.#ctor(System.String,System.Boolean)">
@@ -46,18 +71,37 @@
             Dispose.
             </summary>
         </member>
-        <member name="M:PQueue.PersistentQueue.Enqueue(System.Byte[])">
+        <member name="M:PQueue.PersistentQueue.Enqueue(System.String,System.Nullable{System.DateTime})">
             <summary>
             Add data to the queue.
             </summary>
             <param name="data">Data.</param>
+            <param name="expiration">Timestamp at which the data should be expired from the queue.</param>
             <returns>Key.</returns>
         </member>
-        <member name="M:PQueue.PersistentQueue.EnqueueAsync(System.Byte[],System.Threading.CancellationToken)">
+        <member name="M:PQueue.PersistentQueue.Enqueue(System.Byte[],System.Nullable{System.DateTime})">
+            <summary>
+            Add data to the queue.
+            </summary>
+            <param name="data">Data.</param>
+            <param name="expiration">Timestamp at which the data should be expired from the queue.</param>
+            <returns>Key.</returns>
+        </member>
+        <member name="M:PQueue.PersistentQueue.EnqueueAsync(System.String,System.Nullable{System.DateTime},System.Threading.CancellationToken)">
             <summary>
             Add data to the queue asynchronously.
             </summary>
             <param name="data">Data.</param>
+            <param name="expiration">Timestamp at which the data should be expired from the queue.</param>
+            <param name="token">Cancellation token.</param>
+            <returns>Key.</returns>
+        </member>
+        <member name="M:PQueue.PersistentQueue.EnqueueAsync(System.Byte[],System.Nullable{System.DateTime},System.Threading.CancellationToken)">
+            <summary>
+            Add data to the queue asynchronously.
+            </summary>
+            <param name="data">Data.</param>
+            <param name="expiration">Timestamp at which the data should be expired from the queue.</param>
             <param name="token">Cancellation token.</param>
             <returns>Key.</returns>
         </member>
@@ -84,10 +128,83 @@
             </summary>
             <param name="key">Key.</param>
         </member>
+        <member name="M:PQueue.PersistentQueue.Expire(System.String)">
+            <summary>
+            Remove a specific entry due to expiration.
+            </summary>
+            <param name="key">Key.</param>
+        </member>
+        <member name="M:PQueue.PersistentQueue.GetExpiration(System.String)">
+            <summary>
+            Retrieve the expiration timestamp for a given key.
+            </summary>
+            <param name="key">Key.</param>
+            <returns>Nullable DateTime.</returns>
+        </member>
         <member name="M:PQueue.PersistentQueue.Clear">
             <summary>
             Destructively empty the queue.  This will delete all of the files in the directory.
             </summary>
+        </member>
+        <member name="T:PQueue.QueueManager">
+            <summary>
+            Queue manager.
+            </summary>
+        </member>
+        <member name="M:PQueue.QueueManager.#ctor">
+            <summary>
+            Instantiate.
+            </summary>
+        </member>
+        <member name="M:PQueue.QueueManager.Add(System.String,PQueue.PersistentQueue)">
+            <summary>
+            Add a queue using the specified key.
+            </summary>
+            <param name="key">Key.</param>
+            <param name="queue">Queue.</param>
+        </member>
+        <member name="M:PQueue.QueueManager.TryAdd(System.String,PQueue.PersistentQueue)">
+            <summary>
+            Add a queue using the specified key.
+            </summary>
+            <param name="key">Key.</param>
+            <param name="queue">Queue.</param>
+            <returns>Boolean indicating success.</returns>
+        </member>
+        <member name="M:PQueue.QueueManager.Remove(System.String)">
+            <summary>
+            Remove a queue using the specified key.
+            </summary>
+            <param name="key">Key.</param>
+        </member>
+        <member name="M:PQueue.QueueManager.TryRemove(System.String)">
+            <summary>
+            Remove a queue using the specified key.
+            </summary>
+            <param name="key">Key.</param>
+            <returns>Boolean indicating success.</returns>
+        </member>
+        <member name="M:PQueue.QueueManager.Exists(System.String)">
+            <summary>
+            Check if a queue exists by key.
+            </summary>
+            <param name="key">Key.</param>
+            <returns>Boolean indicating existence.</returns>
+        </member>
+        <member name="M:PQueue.QueueManager.Get(System.String)">
+            <summary>
+            Retrieve a queue by key.
+            </summary>
+            <param name="key">Key.</param>
+            <returns>Queue.</returns>
+        </member>
+        <member name="M:PQueue.QueueManager.TryGet(System.String,PQueue.PersistentQueue@)">
+            <summary>
+            Retrieve a queue by key.
+            </summary>
+            <param name="key">Key.</param>
+            <param name="queue">Queue.</param>
+            <returns>Boolean indicating success.</returns>
         </member>
     </members>
 </doc>

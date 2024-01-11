@@ -36,6 +36,26 @@ namespace PQueue
         }
 
         /// <summary>
+        /// Number of bytes waiting in the queue.
+        /// </summary>
+        public long Length
+        {
+            get
+            {
+                _Semaphore.Wait();
+
+                try
+                {
+                    return Task.Run(() => _DirectoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length)).Result;
+                }
+                finally
+                {
+                    _Semaphore.Release();
+                }
+            }
+        }
+
+        /// <summary>
         /// Event handler for when data is queued.
         /// </summary>
         public EventHandler<string> DataQueued { get; set; }
@@ -51,9 +71,52 @@ namespace PQueue
         public EventHandler<string> DataDeleted { get; set; }
 
         /// <summary>
+        /// Event handler for when data is expired.
+        /// </summary>
+        public EventHandler<string> DataExpired { get; set; }
+
+        /// <summary>
+        /// Event handler for when an exception is raised.
+        /// </summary>
+        public EventHandler<Exception> ExceptionEncountered { get; set; }
+
+        /// <summary>
         /// Event handler for when the queue is cleared.
         /// </summary>
         public EventHandler QueueCleared { get; set; }
+
+        /// <summary>
+        /// Name of the expiration file.  This file will live in the same directory as queued objects.
+        /// </summary>
+        public string ExpiryFile
+        {
+            get
+            {
+                return _ExpiryFile;
+            }
+            set
+            {
+                if (String.IsNullOrEmpty(value)) throw new ArgumentNullException(nameof(ExpiryFile));
+                FileInfo fi = new FileInfo(value);
+                _ExpiryFile = fi.Name;
+            }
+        }
+
+        /// <summary>
+        /// The number of milliseconds in between checks for expired files.
+        /// </summary>
+        public int ExpirationIntervalMs
+        {
+            get
+            {
+                return _ExpirationIntervalMs;
+            }
+            set
+            {
+                if (value < 1) throw new ArgumentOutOfRangeException(nameof(ExpirationIntervalMs));
+                _ExpirationIntervalMs = value;
+            }
+        }
 
         #endregion
 
@@ -63,6 +126,12 @@ namespace PQueue
         private SemaphoreSlim _Semaphore = new SemaphoreSlim(1, 1);
         private string _Directory = null;
         private DirectoryInfo _DirectoryInfo = null;
+
+        private CancellationTokenSource _TokenSource = new CancellationTokenSource();
+        private string _ExpiryFile = ".expire";
+        private readonly object _ExpiryFileLock = new object();
+        private int _ExpirationIntervalMs = 500;
+        private Task _ExpirationTask = null;
 
         #endregion
 
@@ -82,6 +151,8 @@ namespace PQueue
             InitializeDirectory();
 
             _ClearOnDispose = clearOnDispose;
+
+            _ExpirationTask = Task.Run(() => ExpirationTask(_TokenSource.Token), _TokenSource.Token);
         }
 
         #endregion
@@ -102,14 +173,30 @@ namespace PQueue
             _Directory = null;
             _DirectoryInfo = null;
             _Semaphore = null;
+            _TokenSource.Cancel();
+            _ExpirationTask = null;
+            _ExpiryFile = null;
         }
 
         /// <summary>
         /// Add data to the queue.
         /// </summary>
         /// <param name="data">Data.</param>
+        /// <param name="expiration">Timestamp at which the data should be expired from the queue.</param>
         /// <returns>Key.</returns>
-        public string Enqueue(byte[] data)
+        public string Enqueue(string data, DateTime? expiration = null)
+        {
+            if (String.IsNullOrEmpty(data)) throw new ArgumentNullException(nameof(data));
+            return Enqueue(Encoding.UTF8.GetBytes(data), expiration);
+        }
+
+        /// <summary>
+        /// Add data to the queue.
+        /// </summary>
+        /// <param name="data">Data.</param>
+        /// <param name="expiration">Timestamp at which the data should be expired from the queue.</param>
+        /// <returns>Key.</returns>
+        public string Enqueue(byte[] data, DateTime? expiration = null)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
 
@@ -129,6 +216,9 @@ namespace PQueue
                 _Semaphore.Release();
             }
 
+            if (expiration != null)
+                AddExpiredObject(key, expiration.Value);
+
             DataQueued?.Invoke(this, key);
 
             return key;
@@ -138,9 +228,23 @@ namespace PQueue
         /// Add data to the queue asynchronously.
         /// </summary>
         /// <param name="data">Data.</param>
+        /// <param name="expiration">Timestamp at which the data should be expired from the queue.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Key.</returns>
-        public async Task<string> EnqueueAsync(byte[] data, CancellationToken token = default)
+        public async Task<string> EnqueueAsync(string data, DateTime? expiration = null, CancellationToken token = default)
+        {
+            if (String.IsNullOrEmpty(data)) throw new ArgumentNullException(nameof(data));
+            return await EnqueueAsync(Encoding.UTF8.GetBytes(data), expiration, token).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Add data to the queue asynchronously.
+        /// </summary>
+        /// <param name="data">Data.</param>
+        /// <param name="expiration">Timestamp at which the data should be expired from the queue.</param>
+        /// <param name="token">Cancellation token.</param>
+        /// <returns>Key.</returns>
+        public async Task<string> EnqueueAsync(byte[] data, DateTime? expiration = null, CancellationToken token = default)
         {
             if (data == null) throw new ArgumentNullException(nameof(data));
 
@@ -160,6 +264,9 @@ namespace PQueue
                 _Semaphore.Release();
             }
 
+            if (expiration != null)
+                AddExpiredObject(key, expiration.Value);
+
             DataQueued?.Invoke(this, key);
 
             return key;
@@ -171,9 +278,9 @@ namespace PQueue
         /// <param name="key">Key, if a specific key is needed.</param>
         /// <param name="purge">Boolean flag indicating whether or not the entry should be removed from the queue once read.</param>
         /// <returns>Data.</returns>
-        public byte[] Dequeue(string key = null, bool purge = false)
+        public (string, byte[])? Dequeue(string key = null, bool purge = false)
         {
-            byte[] ret = null;
+            (string, byte[]) ret;
             string actualKey = null;
 
             _Semaphore.Wait();
@@ -186,34 +293,31 @@ namespace PQueue
                     string latest = GetLatestKey();
                     if (String.IsNullOrEmpty(latest)) return null;
                     key = latest;
+                    ret.Item1 = latest;
 
                     actualKey = GetKey(latest);
                     int size = GetFileSize(latest);
 
                     using (FileStream fs = new FileStream(actualKey, FileMode.Open, FileAccess.Read))
                     {
-                        ret = new byte[size];
-                        fs.Read(ret, 0, size);
+                        ret.Item2 = new byte[size];
+                        fs.Read(ret.Item2, 0, size);
                     }
                 }
                 else
                 {
                     // Get specific
                     if (!KeyExists(key)) throw new KeyNotFoundException("The specified key '" + key + "' does not exist.");
-                    
+
+                    ret.Item1 = key;
                     actualKey = GetKey(key);
                     int size = GetFileSize(key);
 
                     using (FileStream fs = new FileStream(actualKey, FileMode.Open, FileAccess.Read))
                     {
-                        ret = new byte[size];
-                        fs.Read(ret, 0, size);
+                        ret.Item2 = new byte[size];
+                        fs.Read(ret.Item2, 0, size);
                     }
-                }
-
-                if (purge)
-                {
-                    File.Delete(actualKey);
                 }
             }
             finally
@@ -223,7 +327,11 @@ namespace PQueue
 
             DataDequeued?.Invoke(this, key);
 
-            if (purge) DataDeleted?.Invoke(this, key);
+            if (purge)
+            {
+                Purge(key);
+                RemoveExpiredObject(key);
+            }
 
             return ret;
         }
@@ -235,9 +343,9 @@ namespace PQueue
         /// <param name="purge">Boolean flag indicating whether or not the entry should be removed from the queue once read.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>Data.</returns>
-        public async Task<byte[]> DequeueAsync(string key = null, bool purge = false, CancellationToken token = default)
+        public async Task<(string, byte[])?> DequeueAsync(string key = null, bool purge = false, CancellationToken token = default)
         {
-            byte[] ret = null;
+            (string, byte[]) ret;
             string actualKey = null;
 
             await _Semaphore.WaitAsync();
@@ -250,34 +358,31 @@ namespace PQueue
                     string latest = GetLatestKey();
                     if (String.IsNullOrEmpty(latest)) return null;
                     key = latest;
+                    ret.Item1 = latest;
 
                     actualKey = GetKey(latest);
                     int size = GetFileSize(latest);
 
                     using (FileStream fs = new FileStream(actualKey, FileMode.Open, FileAccess.Read))
                     {
-                        ret = new byte[size];
-                        await fs.ReadAsync(ret, 0, size, token).ConfigureAwait(false);
+                        ret.Item2 = new byte[size];
+                        await fs.ReadAsync(ret.Item2, 0, size, token).ConfigureAwait(false);
                     }
                 }
                 else
                 {
                     // Get specific
                     if (!KeyExists(key)) throw new KeyNotFoundException("The specified key '" + key + "' does not exist.");
-                    
+
+                    ret.Item1 = key;
                     actualKey = GetKey(key);
                     int size = GetFileSize(key);
 
                     using (FileStream fs = new FileStream(actualKey, FileMode.Open, FileAccess.Read))
                     {
-                        ret = new byte[size];
-                        await fs.ReadAsync(ret, 0, size, token).ConfigureAwait(false);
+                        ret.Item2 = new byte[size];
+                        await fs.ReadAsync(ret.Item2, 0, size, token).ConfigureAwait(false);
                     }
-                }
-
-                if (purge)
-                {
-                    File.Delete(actualKey);
                 }
             }
             finally
@@ -287,7 +392,11 @@ namespace PQueue
 
             DataDequeued?.Invoke(this, key);
 
-            if (purge) DataDeleted?.Invoke(this, key);
+            if (purge)
+            {
+                Purge(key);
+                RemoveExpiredObject(key);
+            }
 
             return ret;
         }
@@ -300,14 +409,13 @@ namespace PQueue
         {
             if (String.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
 
-            if (!KeyExists(key)) throw new KeyNotFoundException("The specified key '" + key + "' does not exist.");
             string actualKey = GetKey(key);
 
             _Semaphore.Wait();
 
             try
             {
-                File.Delete(actualKey);
+                if (File.Exists(actualKey)) File.Delete(actualKey);
             }
             finally
             {
@@ -315,6 +423,28 @@ namespace PQueue
             }
 
             DataDeleted?.Invoke(this, key);
+        }
+
+        /// <summary>
+        /// Remove a specific entry due to expiration.
+        /// </summary>
+        /// <param name="key">Key.</param>
+        public void Expire(string key)
+        {
+            if (String.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+            RemoveExpiredObject(key);
+            Purge(key);
+        }
+
+        /// <summary>
+        /// Retrieve the expiration timestamp for a given key.
+        /// </summary>
+        /// <param name="key">Key.</param>
+        /// <returns>Nullable DateTime.</returns>
+        public DateTime? GetExpiration(string key)
+        {
+            if (String.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+            return GetObjectExpiration(key);
         }
 
         /// <summary>
@@ -364,8 +494,9 @@ namespace PQueue
         private string GetLatestKey()
         {
             FileInfo file = _DirectoryInfo.GetFiles()
-             .OrderByDescending(f => f.LastWriteTime)
-             .First();
+                .Where(f => !f.Name.Equals(_ExpiryFile))
+                .OrderByDescending(f => f.LastWriteTime)
+                .First();
 
             if (file != null) return file.Name;
             else return null;
@@ -380,6 +511,184 @@ namespace PQueue
         private bool KeyExists(string str)
         {
             return File.Exists(GetKey(str));
+        }
+
+        private IEnumerable<KeyValuePair<string, DateTime>> EnumerateExpiringObjects()
+        {
+            string[] lines = null;
+            string filename = GetKey(_ExpiryFile);
+
+            lock (_ExpiryFileLock)
+            {
+                lines = File.ReadAllLines(GetKey(_ExpiryFile));
+            }
+
+            if (lines != null && lines.Length > 0)
+            {
+                for (int i = 0; i < lines.Length; i++) 
+                {
+                    KeyValuePair<string, DateTime>? kvp = ParseExpiryFileLine(i, lines[i]);
+                    if (kvp == null)
+                    {
+                        ExceptionEncountered?.Invoke(this, new ArgumentException("Invalid line format detected in line " + i + " of expiry file " + filename));
+                        continue;
+                    }
+
+                    yield return kvp.Value;
+                }
+            }
+
+            yield break;
+        }
+
+        private void AddExpiredObject(string key, DateTime expiration)
+        {
+            if (String.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+
+            string filename = GetKey(_ExpiryFile);
+
+            List<string> updatedLines = new List<string>();
+
+            lock (_ExpiryFileLock)
+            {
+                string[] lines = File.ReadAllLines(filename);
+
+                if (lines != null && lines.Length > 0)
+                {
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        KeyValuePair<string, DateTime>? line = ParseExpiryFileLine(i, lines[i]);
+                        if (line == null) continue;
+                        if (!line.Value.Key.Equals(key)) updatedLines.Add(line.Value.Key + " " + line.Value.Value.ToString());
+                    }
+                }
+
+                updatedLines.Add(key + " " + expiration.ToString());
+                File.Delete(filename);
+                File.WriteAllLines(filename, updatedLines);
+            }
+        }
+
+        private DateTime? GetObjectExpiration(string key)
+        {
+            if (String.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+
+            string filename = GetKey(_ExpiryFile);
+
+            lock (_ExpiryFileLock)
+            {
+                string[] lines = File.ReadAllLines(filename);
+
+                if (lines != null && lines.Length > 0)
+                {
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        KeyValuePair<string, DateTime>? line = ParseExpiryFileLine(i, lines[i]);
+                        if (line == null) continue;
+                        if (line.Value.Key.Equals(key)) return line.Value.Value;
+                    }
+                }
+
+                return null;
+            }
+        }
+
+        private void RemoveExpiredObject(string key)
+        {
+            if (String.IsNullOrEmpty(key)) throw new ArgumentNullException(nameof(key));
+
+            string filename = GetKey(_ExpiryFile);
+
+            List<string> updatedLines = new List<string>();
+
+            lock (_ExpiryFileLock)
+            {
+                string[] lines = File.ReadAllLines(filename);
+
+                if (lines != null && lines.Length > 0)
+                {
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        KeyValuePair<string, DateTime>? line = ParseExpiryFileLine(i, lines[i]);
+                        if (line == null) continue;
+                        if (!line.Value.Key.Equals(key)) updatedLines.Add(line.Value.Key);
+                        else DataExpired?.Invoke(this, key);
+                    }
+                }
+
+                File.Delete(filename);
+                File.WriteAllLines(filename, updatedLines);
+            }
+        }
+
+        private async Task ExpirationTask(CancellationToken token = default)
+        {
+            string filename = GetKey(_ExpiryFile);
+
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(_ExpirationIntervalMs, token).ConfigureAwait(false);
+
+                if (!File.Exists(filename))
+                    File.WriteAllBytes(filename, Array.Empty<byte>());
+
+                try
+                {
+                    foreach (KeyValuePair<string, DateTime> expired in EnumerateExpiringObjects())
+                    {
+                        if (token.IsCancellationRequested) break;
+
+                        if (expired.Value < DateTime.Now)
+                        {
+                            RemoveExpiredObject(expired.Key);
+                            Purge(expired.Key);
+                        }
+                    }
+                }
+                catch (TaskCanceledException)
+                {
+
+                }
+                catch (OperationCanceledException)
+                {
+
+                }
+                catch (Exception e)
+                {
+                    ExceptionEncountered?.Invoke(this, e);
+                }
+            }
+        }
+
+        private KeyValuePair<string, DateTime>? ParseExpiryFileLine(int lineNumber, string line)
+        {
+            string[] parts = line.Split(new char[] { ' ' }, 2);
+            string filename = GetKey(_ExpiryFile);
+
+            if (parts.Length != 2)
+            {
+                ExceptionEncountered?.Invoke(
+                    this, 
+                    new ArgumentException("Invalid line format detected in line " + lineNumber + " of expiry file " + filename));
+
+                return null;
+            }
+
+            DateTime expires = DateTime.Now;
+            try
+            {
+                expires = DateTime.Parse(parts[1]);
+            }
+            catch (Exception)
+            {
+                ExceptionEncountered?.Invoke(
+                    this, 
+                    new ArgumentException("Invalid DateTime format detected in line " + lineNumber + " of expiry file " + filename));
+
+                return null;
+            }
+
+            return new KeyValuePair<string, DateTime>(parts[0], expires);
         }
 
         #endregion
