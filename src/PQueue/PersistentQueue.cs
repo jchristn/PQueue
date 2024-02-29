@@ -26,7 +26,16 @@ namespace PQueue
 
                 try
                 {
-                    return Directory.GetFiles(_Directory, "*", SearchOption.TopDirectoryOnly).Length;
+                    string[] files = Directory.GetFiles(_Directory, "*", SearchOption.TopDirectoryOnly);
+                    if (files != null)
+                    {
+                        files = files.Where(f => !Path.GetFileName(f).Equals(_ExpiryFile)).ToArray();
+                        return files.Length;
+                    }
+                    else
+                    {
+                        return 0;
+                    }
                 }
                 finally
                 {
@@ -46,7 +55,20 @@ namespace PQueue
 
                 try
                 {
-                    return Task.Run(() => _DirectoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length)).Result;
+                    return Task.Run(() =>
+                    {
+                        IEnumerable<FileInfo> files = _DirectoryInfo.EnumerateFiles("*", SearchOption.AllDirectories).ToArray();
+                        if (files != null && files.Count() > 0)
+                        {
+                            files = files.Where(f => !Path.GetFileName(f.Name).Equals(_ExpiryFile));
+                            return files.Sum(f => f.Length);
+                        }
+                        else
+                        {
+                            return 0;
+                        }
+                    
+                    }).Result;
                 }
                 finally
                 {
@@ -493,12 +515,12 @@ namespace PQueue
 
         private string GetLatestKey()
         {
-            FileInfo file = _DirectoryInfo.GetFiles()
+            FileInfo[] files = _DirectoryInfo.GetFiles()
                 .Where(f => !f.Name.Equals(_ExpiryFile))
                 .OrderByDescending(f => f.LastWriteTime)
-                .First();
-
-            if (file != null) return file.Name;
+                .ToArray();
+             
+            if (files != null && files.Length > 0) return files[0].Name;
             else return null;
         }
 
