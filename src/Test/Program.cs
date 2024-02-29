@@ -106,6 +106,8 @@ namespace Test
 
         private static void Dequeue()
         {
+            (string, byte[])? msg = _Queue.Dequeue();
+            /*
             string key = Inputty.GetString("Key   :", null, true);
             bool purge = Inputty.GetBoolean("Purge :", false);
             (string, byte[])? ret = _Queue.Dequeue(key, purge);
@@ -113,6 +115,7 @@ namespace Test
             {
                 Console.WriteLine(ret.Value.Item1 + ": " + Encoding.UTF8.GetString(ret.Value.Item2));
             }
+            */
         }
 
         private static void Purge()

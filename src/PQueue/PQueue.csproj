@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFrameworks>net48;net6.0;net7.0;net8.0</TargetFrameworks>
@@ -16,7 +16,7 @@
 		<RepositoryType>github</RepositoryType>
 		<PackageTags>queue persistent persistence disk</PackageTags>
 		<PackageReleaseNotes>Initial release</PackageReleaseNotes>
-		<Version>1.0.6</Version>
+		<Version>1.0.7</Version>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
 

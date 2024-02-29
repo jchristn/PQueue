@@ -515,12 +515,11 @@ namespace PQueue
 
         private string GetLatestKey()
         {
-            FileInfo[] files = _DirectoryInfo.GetFiles()
+            IOrderedEnumerable<FileInfo> files = _DirectoryInfo.GetFiles()
                 .Where(f => !f.Name.Equals(_ExpiryFile))
-                .OrderByDescending(f => f.LastWriteTime)
-                .ToArray();
-             
-            if (files != null && files.Length > 0) return files[0].Name;
+                .OrderByDescending(f => f.LastWriteTime);
+ 
+            if (files != null && files.Count() > 0) return files.ToArray()[0].Name;
             else return null;
         }
 
